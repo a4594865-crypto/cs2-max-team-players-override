@@ -1,40 +1,12 @@
-name: Build and Release CS2 Plugin
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      # 4. 改用 publish 指令並強制指定輸出到 ./publish 資料夾
-      - name: Publish Plugin
-        run: dotnet publish --configuration Release --no-restore -o ./publish
-
-      # 5. 清理非必要檔案（選用，確保下載包只有 DLL）
-      - name: Cleanup Non-DLL files
+# 5. 只清理對運行無關的檔案 (例如 pdb 偵錯檔或 xml 文檔)
+      - name: Cleanup Non-essential files
         run: |
-          find ./publish -type f ! -name "*.dll" -delete
+          find ./publish -type f -name "*.pdb" -delete
+          find ./publish -type f -name "*.xml" -delete
 
-      # 6. 直接上傳 ./publish 目錄
+      # 6. 上傳 publish 目錄 (這時裡面會保留 dll, deps.json, runtimeconfig.json)
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MaxTeamPlayersOverride-Build-v${{ github.run_number }}
+          name: MaxTeamPlayersOverride-v${{ github.run_number }}
           path: ./publish/
