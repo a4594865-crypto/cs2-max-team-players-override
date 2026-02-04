@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -11,26 +9,31 @@ namespace MaxTeamPlayersOverride
 {
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
+        // 核心開關：預設關閉，由管理員手動開啟
         private bool _isOverrideEnabled = false;
 
-        public override string ModuleName => "Max Team Players Override";
+        public override string ModuleName => "Max Team Players Override Plugin";
 
         public override void Load(bool hotReload)
         {
-            // 註冊回合開始事件
+            // 每回合開始時執行
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
+                // 只有在開啟狀態下才執行修改邏輯
                 if (!_isOverrideEnabled) return HookResult.Continue;
+
                 ApplyTeamLimits();
                 return HookResult.Continue;
             });
 
-            Console.WriteLine("[MaxTeam] 插件已啟動。支援指令: .ctmax, .unctmax (僅限熱身)");
+            // 插件啟動日誌
+            Console.WriteLine("[MaxTeam] 插件載入。指令: .ctmax / .unctmax (僅限熱身期間)");
         }
 
-        // --- 使用 ConsoleCommand 註冊指令，這在 1.0.362 中最穩定 ---
-        
-        [ConsoleCommand(".ctmax", "在熱身期間啟用人數覆蓋")]
+        // --- 註冊指令：使用相容性最高的 ConsoleCommand 模式 ---
+        // 雖然是 . 開頭，但在聊天框輸入仍會觸發
+
+        [ConsoleCommand(".ctmax", "在熱身期間開啟人數覆蓋")]
         [RequiresPermissions("@css/generic")]
         public void OnEnableCommand(CCSPlayerController? player, CommandInfo info)
         {
@@ -38,7 +41,7 @@ namespace MaxTeamPlayersOverride
 
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟人數覆蓋。");
                 return;
             }
 
@@ -55,7 +58,7 @@ namespace MaxTeamPlayersOverride
 
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能關閉。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能禁用人數覆蓋。");
                 return;
             }
 
@@ -63,27 +66,48 @@ namespace MaxTeamPlayersOverride
             Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋（下回合生效）。");
         }
 
+        // 偵測是否在熱身期間
         private bool IsWarmup()
         {
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-            // 使用 m_bWarmupPeriod 的底層屬性映射，這是最保險的熱身偵測
+            // 1.0.362 中最穩定的熱身判斷屬性
             return gameRulesProxy?.GameRules?.WarmupPeriod ?? false;
         }
 
         private void ApplyTeamLimits()
         {
-            int maxTs = Config.MaxTs < 0 ? Server.MaxPlayers / 2 : Config.MaxTs;
-            int maxCTs = Config.MaxCTs < 0 ? Server.MaxPlayers / 2 : Config.MaxCTs;
+            int maxTs = Config.MaxTs;
+            int maxCTs = Config.MaxCTs;
 
+            if (maxTs < 0) maxTs = Server.MaxPlayers / 2;
+            if (maxCTs < 0) maxCTs = Server.MaxPlayers / 2;
+
+            SetMaxTs(maxTs);
+            SetMaxCTs(maxCTs);
+        }
+
+        private static void SetMaxTs(int num)
+        {
             var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
             foreach (var ent in ents)
             {
                 if (ent.GameRules != null)
                 {
-                    ent.GameRules.NumSpawnableTerrorist = maxTs;
-                    ent.GameRules.MaxNumTerrorists = maxTs;
-                    ent.GameRules.NumSpawnableCT = maxCTs;
-                    ent.GameRules.MaxNumCTs = maxCTs;
+                    ent.GameRules.NumSpawnableTerrorist = num;
+                    ent.GameRules.MaxNumTerrorists = num;
+                }
+            }
+        }
+
+        private static void SetMaxCTs(int num)
+        {
+            var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
+            foreach (var ent in ents)
+            {
+                if (ent.GameRules != null)
+                {
+                    ent.GameRules.NumSpawnableCT = num;
+                    ent.GameRules.MaxNumCTs = num;
                 }
             }
         }
