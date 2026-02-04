@@ -9,68 +9,71 @@ namespace MaxTeamPlayersOverride
 {
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
-        // 核心開關：預設關閉，由管理員手動開啟
         private bool _isOverrideEnabled = false;
 
         public override string ModuleName => "Max Team Players Override Plugin";
 
         public override void Load(bool hotReload)
         {
-            // 每回合開始時執行
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
-                // 只有在開啟狀態下才執行修改邏輯
                 if (!_isOverrideEnabled) return HookResult.Continue;
-
                 ApplyTeamLimits();
                 return HookResult.Continue;
             });
 
-            // 插件啟動日誌
-            Console.WriteLine("[MaxTeam] 插件載入。指令: .ctmax / .unctmax (僅限熱身期間)");
+            // 伺服器啟動時，在黑視窗印出提示，確認 Load 真的有執行
+            Console.WriteLine("##############################################");
+            Console.WriteLine("[MaxTeam] 插件已啟動！請嘗試在遊戲內輸入 .ctmax");
+            Console.WriteLine("##############################################");
         }
 
-        // --- 註冊指令：使用相容性最高的 ConsoleCommand 模式 ---
-        // 雖然是 . 開頭，但在聊天框輸入仍會觸發
-
-        [ConsoleCommand(".ctmax", "在熱身期間開啟人數覆蓋")]
-        [RequiresPermissions("@css/admin")]
+        // 修改為通用 Command，手動判斷權限
+        [ConsoleCommand("css_ctmax", "開啟人數覆蓋")]
+        [ConsoleCommand(".ctmax", "開啟人數覆蓋")]
         public void OnEnableCommand(CCSPlayerController? player, CommandInfo info)
         {
             if (player == null) return;
 
+            // 手動檢查權限，若失敗則回傳提示，不再保持沉默
+            if (!AdminManager.PlayerHasPermissions(player, "@css/generic"))
+            {
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：您沒有權限執行此指令。");
+                return;
+            }
+
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟人數最大化。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟。");
                 return;
             }
 
             _isOverrideEnabled = true;
             ApplyTeamLimits();
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數最大化 8 v 8。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員 {ChatColors.Blue}{player.PlayerName} {ChatColors.Default}已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
         }
 
-        [ConsoleCommand(".unctmax", "在熱身期間禁用人數覆蓋")]
-        [RequiresPermissions("@css/generic")]
+        [ConsoleCommand("css_unctmax", "禁用人數覆蓋")]
+        [ConsoleCommand(".unctmax", "禁用人數覆蓋")]
         public void OnDisableCommand(CCSPlayerController? player, CommandInfo info)
         {
             if (player == null) return;
 
+            if (!AdminManager.PlayerHasPermissions(player, "@css/generic")) return;
+
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能禁用人數最大化。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：僅限熱身期間。");
                 return;
             }
 
             _isOverrideEnabled = false;
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數人數最大化。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋。");
         }
 
-        // 偵測是否在熱身期間
         private bool IsWarmup()
         {
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-            // 1.0.362 中最穩定的熱身判斷屬性
             return gameRulesProxy?.GameRules?.WarmupPeriod ?? false;
         }
 
@@ -78,18 +81,15 @@ namespace MaxTeamPlayersOverride
         {
             int maxTs = Config.MaxTs;
             int maxCTs = Config.MaxCTs;
-
             if (maxTs < 0) maxTs = Server.MaxPlayers / 2;
             if (maxCTs < 0) maxCTs = Server.MaxPlayers / 2;
-
             SetMaxTs(maxTs);
             SetMaxCTs(maxCTs);
         }
 
         private static void SetMaxTs(int num)
         {
-            var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
-            foreach (var ent in ents)
+            foreach (var ent in Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules"))
             {
                 if (ent.GameRules != null)
                 {
@@ -101,8 +101,7 @@ namespace MaxTeamPlayersOverride
 
         private static void SetMaxCTs(int num)
         {
-            var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
-            foreach (var ent in ents)
+            foreach (var ent in Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules"))
             {
                 if (ent.GameRules != null)
                 {
