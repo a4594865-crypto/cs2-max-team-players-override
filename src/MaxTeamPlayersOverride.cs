@@ -9,50 +9,75 @@ namespace MaxTeamPlayersOverride
 {
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
-        // 運行時狀態：地圖更換後會自動重置為 false
+        // 核心開關：預設為 false，確保插件在「怠速」狀態，不執行任何修改
         private bool _isOverrideEnabled = false;
 
-        public override string ModuleName => "Max Team Players Override Plugin";
+        public override string ModuleName => "Max Team Players Override (Manual Toggle)";
+        public override string ModuleVersion => "1.1.5";
 
         public override void Load(bool hotReload)
         {
+            // 監聽聊天事件，實現自定義的 '.' 前綴指令
+            RegisterEventHandler<EventPlayerChat>((@event, info) =>
+            {
+                var player = @event.Userid;
+                if (player == null || !player.IsValid) return HookResult.Continue;
+
+                string message = @event.Text.Trim();
+
+                // 處理 .ctmax (開啟)
+                if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
+                    {
+                        EnableOverride();
+                        return HookResult.Handled; // 隱藏管理員輸入的指令訊息
+                    }
+                }
+                // 處理 .unctmax (關閉)
+                else if (message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
+                    {
+                        DisableOverride();
+                        return HookResult.Handled;
+                    }
+                }
+
+                return HookResult.Continue;
+            });
+
             // 註冊回合開始事件
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
-                // 如果未開啟覆蓋，則跳過邏輯
+                // 【物理斷路器】只要沒開啟，此處直接返回，不搜尋實體、不消耗性能、不修改人數
                 if (!_isOverrideEnabled) return HookResult.Continue;
 
                 ApplyTeamLimits();
                 return HookResult.Continue;
             });
+
+            // 伺服器啟動日誌，方便管理員確認狀態
+            Console.WriteLine("[MaxTeam] 插件載入成功。初始狀態：待命中（未啟用）。");
         }
 
-        // 修改指令為 "ctmax"
-        // 權限：@css/generic (管理員)
-        [ConsoleCommand("ctmax", "啟用或禁用人數覆蓋 (僅限本地圖生效)")]
-        [CommandHelper(minArgs: 1, usage: "<1/0>", whoCanExecute: CommandUsage.CLIENT_AND_SERVER)]
-        [RequiresPermissions("@css/admin")]
-        public void OnMaxOverrideCommand(CCSPlayerController? player, CommandInfo info)
+        private void EnableOverride()
         {
-            string arg = info.ArgByIndex(1);
-            _isOverrideEnabled = arg == "1";
+            _isOverrideEnabled = true;
 
-            if (_isOverrideEnabled)
-            {
-                // 從 Config 獲取數值，若為 -1 則自動平分伺服器最大人數
-                int t = Config.MaxTs < 0 ? Server.MaxPlayers / 2 : Config.MaxTs;
-                int ct = Config.MaxCTs < 0 ? Server.MaxPlayers / 2 : Config.MaxCTs;
+            int t = Config.MaxTs < 0 ? Server.MaxPlayers / 2 : Config.MaxTs;
+            int ct = Config.MaxCTs < 0 ? Server.MaxPlayers / 2 : Config.MaxCTs;
 
-                // 全服廣播
-                Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已啟用人數覆蓋：{ChatColors.Red}{t}T {ChatColors.Default}v {ChatColors.Blue}{ct}CT");
-                
-                // 立即套用設定
-                ApplyTeamLimits();
-            }
-            else
-            {
-                Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已禁用人數覆蓋，下回合將恢復預設。");
-            }
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋：{ChatColors.Red}{t}T {ChatColors.Default}v {ChatColors.Blue}{ct}CT");
+            
+            // 啟用後立即套用一次，不需等下回合
+            ApplyTeamLimits();
+        }
+
+        private void DisableOverride()
+        {
+            _isOverrideEnabled = false;
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋，下回合將恢復預設。");
         }
 
         private void ApplyTeamLimits()
@@ -69,7 +94,7 @@ namespace MaxTeamPlayersOverride
             var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
             foreach (var ent in ents)
             {
-                if (ent.GameRules != null) // 安全檢查防止崩潰
+                if (ent.GameRules != null)
                 {
                     ent.GameRules.NumSpawnableTerrorist = num;
                     ent.GameRules.MaxNumTerrorists = num;
