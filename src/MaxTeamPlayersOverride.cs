@@ -9,13 +9,15 @@ namespace MaxTeamPlayersOverride
 {
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
+        // 核心狀態開關
         private bool _isOverrideEnabled = false;
 
         public override string ModuleName => "Max Team Players Override (Warmup Only)";
-        public override string ModuleVersion => "1.1.6";
+        public override string ModuleVersion => "1.0.7";
 
         public override void Load(bool hotReload)
         {
+            // 監聽聊天事件，處理 .ctmax 與 .unctmax
             RegisterEventHandler<EventPlayerChat>((@event, info) =>
             {
                 var player = @event.Userid;
@@ -23,37 +25,33 @@ namespace MaxTeamPlayersOverride
 
                 string message = @event.Text.Trim();
 
-                // 處理 .ctmax
-                if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
+                // 檢查是否為目標指令
+                bool isEnableCmd = message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase);
+                bool isDisableCmd = message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase);
+
+                if (isEnableCmd || isDisableCmd)
                 {
-                    if (AdminManager.PlayerHasPermissions(player, "@css/admin"))
+                    // 1. 權限檢查
+                    if (!AdminManager.PlayerHasPermissions(player, "@css/admin")) return HookResult.Continue;
+
+                    // 2. 熱身狀態檢查 (您的核心邏輯)
+                    if (!IsWarmup())
                     {
-                        // 核心檢查：是否在熱身中
-                        if (IsWarmup()) {
-                            EnableOverride();
-                        } else {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}指令失敗：只能在{ChatColors.Orange}熱身期間{ChatColors.Default}修改人數限制。");
-                        }
+                        player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能更改人數限制。");
                         return HookResult.Handled;
                     }
-                }
-                // 處理 .unctmax
-                else if (message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
-                    {
-                        if (IsWarmup()) {
-                            DisableOverride();
-                        } else {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}指令失敗：只能在{ChatColors.Orange}熱身期間{ChatColors.Default}恢復人數限制。");
-                        }
-                        return HookResult.Handled;
-                    }
+
+                    // 3. 執行對應動作
+                    if (isEnableCmd) EnableOverride();
+                    else DisableOverride();
+
+                    return HookResult.Handled;
                 }
 
                 return HookResult.Continue;
             });
 
+            // 每回合開始時強制套用（如果已開啟）
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
@@ -62,25 +60,26 @@ namespace MaxTeamPlayersOverride
             });
         }
 
-        // 偵測目前是否為熱身時間
+        // 精確偵測熱身狀態
         private bool IsWarmup()
         {
             var gameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
-            return gameRules?.WaitDuringWarmup ?? false; 
-            // 註：CS2 中 WaitDuringWarmup 或 IsWarmupPeriod 是判斷熱身的標準屬性
+            // 檢查是否處於熱身階段
+            return gameRules?.InWarmup ?? false;
         }
 
         private void EnableOverride()
         {
             _isOverrideEnabled = true;
             ApplyTeamLimits();
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已啟用人數最大化 8 v 8。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}開啟{ChatColors.Default}人數最大化 8 v 8。");
         }
 
         private void DisableOverride()
         {
             _isOverrideEnabled = false;
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已禁用人數最大化。");
+            // 注意：禁用後我們不主動改回 5v5，而是讓遊戲下一回合自行恢復預設
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數最大化。");
         }
 
         private void ApplyTeamLimits()
