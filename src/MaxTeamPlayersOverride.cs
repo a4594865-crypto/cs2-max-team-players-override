@@ -10,20 +10,18 @@ using CounterStrikeSharp.API.Modules.Entities;
 
 namespace MaxTeamPlayersOverride
 {
-    // 使用 partial 確保能與 Version.cs 結合
+    // 使用 partial 確保與 Version.cs 結合，請確認 Version.cs 裡的命名空間也是 MaxTeamPlayersOverride
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
         private bool _isOverrideEnabled = false;
 
         public override string ModuleName => "Max Team Players Override";
 
-        // 移除 ModuleVersion 定義，避免與 Version.cs 重複
+        // 注意：此處已移除 ModuleVersion，請統一在 src/Version.cs 修改版本號以觸發發佈
 
         public override void Load(bool hotReload)
         {
-            // 監聽聊天事件
-            // 如果編譯器在此處報錯，代表你的 SDK 版本可能不支援 EventPlayerChat
-            // 建議檢查 .csproj 中的 CounterStrikeSharp.API 版本
+            // 監聽聊天事件處理自定義指令 (.ctmax / .unctmax)
             RegisterEventHandler<EventPlayerChat>((@event, info) =>
             {
                 var player = @event.Userid;
@@ -31,29 +29,37 @@ namespace MaxTeamPlayersOverride
 
                 string message = @event.Text.Trim();
 
+                // 處理開啟指令
                 if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
                 {
                     if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
                     {
-                        if (IsWarmup()) {
+                        if (IsWarmup()) 
+                        {
                             _isOverrideEnabled = true;
                             ApplyTeamLimits();
                             Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
-                        } else {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
+                        } 
+                        else 
+                        {
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改人數限制。");
                         }
                         return HookResult.Handled;
                     }
                 }
+                // 處理關閉指令
                 else if (message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase))
                 {
                     if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
                     {
-                        if (IsWarmup()) {
+                        if (IsWarmup()) 
+                        {
                             _isOverrideEnabled = false;
                             Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋。");
-                        } else {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
+                        } 
+                        else 
+                        {
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能恢復預設。");
                         }
                         return HookResult.Handled;
                     }
@@ -62,6 +68,7 @@ namespace MaxTeamPlayersOverride
                 return HookResult.Continue;
             });
 
+            // 每回合開始檢查並套用限制
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
@@ -70,19 +77,20 @@ namespace MaxTeamPlayersOverride
             });
         }
 
-        // --- 核心修復：相容性最高的熱身判斷 ---
+        // 針對 1.0.362 優化的熱身判斷
         private bool IsWarmup()
         {
+            // 獲取 GameRules 實體
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
             if (gameRulesProxy == null || gameRulesProxy.GameRules == null) return false;
 
-            // 嘗試使用不同的屬性名稱來獲取熱身狀態
-            // 這是 CS2 中最底層的熱身判斷標誌
-            return gameRulesProxy.GameRules.WarmupPeriod; 
+            // 在最新 SDK 中，WarmupPeriod 是標準屬性
+            return gameRulesProxy.GameRules.WarmupPeriod;
         }
 
         private void ApplyTeamLimits()
         {
+            // 這些數值來自自動生成的 config.json
             int maxTs = Config.MaxTs < 0 ? Server.MaxPlayers / 2 : Config.MaxTs;
             int maxCTs = Config.MaxCTs < 0 ? Server.MaxPlayers / 2 : Config.MaxCTs;
 
@@ -91,6 +99,7 @@ namespace MaxTeamPlayersOverride
             {
                 if (ent.GameRules != null)
                 {
+                    // 強制覆寫隊伍生成與上限人數
                     ent.GameRules.NumSpawnableTerrorist = maxTs;
                     ent.GameRules.MaxNumTerrorists = maxTs;
                     ent.GameRules.NumSpawnableCT = maxCTs;
