@@ -26,7 +26,7 @@ namespace MaxTeamPlayersOverride
                 // 處理 .ctmax
                 if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
+                    if (AdminManager.PlayerHasPermissions(player, "@css/admin"))
                     {
                         // 核心檢查：是否在熱身中
                         if (IsWarmup()) {
