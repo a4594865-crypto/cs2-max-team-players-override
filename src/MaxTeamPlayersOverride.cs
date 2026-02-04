@@ -17,65 +17,56 @@ namespace MaxTeamPlayersOverride
 
         public override void Load(bool hotReload)
         {
-            // 使用強制路徑引用，解決找不到 EventPlayerChat 的問題
-            RegisterEventHandler<CounterStrikeSharp.API.Core.EventPlayerChat>((@event, info) =>
-            {
-                if (@event == null) return HookResult.Continue;
-                
-                var player = @event.Userid;
-                if (player == null || !player.IsValid) return HookResult.Continue;
-
-                string message = @event.Text.Trim();
-
-                if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
-                    {
-                        if (IsWarmup()) 
-                        {
-                            _isOverrideEnabled = true;
-                            ApplyTeamLimits();
-                            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
-                        } 
-                        else 
-                        {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
-                        }
-                        return HookResult.Handled;
-                    }
-                }
-                else if (message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
-                    {
-                        if (IsWarmup()) 
-                        {
-                            _isOverrideEnabled = false;
-                            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋。");
-                        } 
-                        else 
-                        {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
-                        }
-                        return HookResult.Handled;
-                    }
-                }
-
-                return HookResult.Continue;
-            });
-
-            RegisterEventHandler<CounterStrikeSharp.API.Core.EventRoundStart>((@event, info) =>
+            // 註冊回合開始事件
+            RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
                 ApplyTeamLimits();
                 return HookResult.Continue;
             });
+
+            Console.WriteLine("[MaxTeam] 插件已啟動。支援指令: .ctmax, .unctmax (僅限熱身)");
+        }
+
+        // --- 使用 ConsoleCommand 註冊指令，這在 1.0.362 中最穩定 ---
+        
+        [ConsoleCommand(".ctmax", "在熱身期間啟用人數覆蓋")]
+        [RequiresPermissions("@css/generic")]
+        public void OnEnableCommand(CCSPlayerController? player, CommandInfo info)
+        {
+            if (player == null) return;
+
+            if (!IsWarmup())
+            {
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟。");
+                return;
+            }
+
+            _isOverrideEnabled = true;
+            ApplyTeamLimits();
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
+        }
+
+        [ConsoleCommand(".unctmax", "在熱身期間禁用人數覆蓋")]
+        [RequiresPermissions("@css/generic")]
+        public void OnDisableCommand(CCSPlayerController? player, CommandInfo info)
+        {
+            if (player == null) return;
+
+            if (!IsWarmup())
+            {
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能關閉。");
+                return;
+            }
+
+            _isOverrideEnabled = false;
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋（下回合生效）。");
         }
 
         private bool IsWarmup()
         {
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-            // 針對 1.0.362 版本的實體屬性路徑
+            // 使用 m_bWarmupPeriod 的底層屬性映射，這是最保險的熱身偵測
             return gameRulesProxy?.GameRules?.WarmupPeriod ?? false;
         }
 
