@@ -1,6 +1,5 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -15,6 +14,12 @@ namespace MaxTeamPlayersOverride
 
         public override void Load(bool hotReload)
         {
+            // --- 核心手動註冊：強制將指令寫入伺服器 ---
+            AddCommand("css_ctmax", "開啟人數覆蓋", CommandEnable);
+            AddCommand(".ctmax", "開啟人數覆蓋", CommandEnable);
+            AddCommand("css_unctmax", "禁用人數覆蓋", CommandDisable);
+            AddCommand(".unctmax", "禁用人數覆蓋", CommandDisable);
+
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
@@ -22,26 +27,26 @@ namespace MaxTeamPlayersOverride
                 return HookResult.Continue;
             });
 
-            // 伺服器啟動時，在黑視窗印出提示，確認 Load 真的有執行
             Console.WriteLine("##############################################");
-            Console.WriteLine("[MaxTeam] 插件已啟動！請嘗試在遊戲內輸入 .ctmax");
+            Console.WriteLine("[MaxTeam] 核心註冊版載入！請在控制台測試 css_ctmax");
             Console.WriteLine("##############################################");
         }
 
-        // 修改為通用 Command，手動判斷權限
-        [ConsoleCommand("css_ctmax", "開啟人數覆蓋")]
-        [ConsoleCommand(".ctmax", "開啟人數覆蓋")]
-        public void OnEnableCommand(CCSPlayerController? player, CommandInfo info)
+        private void CommandEnable(CCSPlayerController? player, CommandInfo info)
         {
             if (player == null) return;
 
-            // 手動檢查權限，若失敗則回傳提示，不再保持沉默
+            // 1. 先噴一句 Debug 訊息，證明指令系統「活著」
+            player.PrintToChat($" {ChatColors.Yellow} [Debug] 收到指令！正在檢查權限與狀態...");
+
+            // 2. 檢查權限
             if (!AdminManager.PlayerHasPermissions(player, "@css/generic"))
             {
                 player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：您沒有權限執行此指令。");
                 return;
             }
 
+            // 3. 檢查熱身
             if (!IsWarmup())
             {
                 player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟。");
@@ -53,22 +58,12 @@ namespace MaxTeamPlayersOverride
             Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員 {ChatColors.Blue}{player.PlayerName} {ChatColors.Default}已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
         }
 
-        [ConsoleCommand("css_unctmax", "禁用人數覆蓋")]
-        [ConsoleCommand(".unctmax", "禁用人數覆蓋")]
-        public void OnDisableCommand(CCSPlayerController? player, CommandInfo info)
+        private void CommandDisable(CCSPlayerController? player, CommandInfo info)
         {
-            if (player == null) return;
-
-            if (!AdminManager.PlayerHasPermissions(player, "@css/generic")) return;
-
-            if (!IsWarmup())
-            {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：僅限熱身期間。");
-                return;
-            }
-
+            if (player == null || !AdminManager.PlayerHasPermissions(player, "@css/generic")) return;
+            
             _isOverrideEnabled = false;
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}人數覆蓋已由管理員禁用。");
         }
 
         private bool IsWarmup()
