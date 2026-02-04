@@ -1,10 +1,40 @@
-# 5. 只清理對運行無關的檔案 (例如 pdb 偵錯檔或 xml 文檔)
+name: Build and Release CS2 Plugin
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # 4. 執行發佈指令，產出 Release 版本
+      - name: Publish Plugin
+        run: dotnet publish --configuration Release --no-restore -o ./publish
+
+      # 5. 【關鍵修改】精確清理：保留 .dll 和 .json，只刪除無用的除錯檔
+      # 在 .NET 8 中，.deps.json 和 .runtimeconfig.json 是插件啟動必備的「身分證」
       - name: Cleanup Non-essential files
         run: |
           find ./publish -type f -name "*.pdb" -delete
           find ./publish -type f -name "*.xml" -delete
 
-      # 6. 上傳 publish 目錄 (這時裡面會保留 dll, deps.json, runtimeconfig.json)
+      # 6. 上傳 publish 目錄下的所有必要檔案
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
