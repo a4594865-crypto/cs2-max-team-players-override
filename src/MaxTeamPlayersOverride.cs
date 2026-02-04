@@ -34,20 +34,20 @@ namespace MaxTeamPlayersOverride
         // 雖然是 . 開頭，但在聊天框輸入仍會觸發
 
         [ConsoleCommand(".ctmax", "在熱身期間開啟人數覆蓋")]
-        [RequiresPermissions("@css/generic")]
+        [RequiresPermissions("@css/admin")]
         public void OnEnableCommand(CCSPlayerController? player, CommandInfo info)
         {
             if (player == null) return;
 
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟人數覆蓋。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能開啟人數最大化。");
                 return;
             }
 
             _isOverrideEnabled = true;
             ApplyTeamLimits();
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數最大化 8 v 8。");
         }
 
         [ConsoleCommand(".unctmax", "在熱身期間禁用人數覆蓋")]
@@ -58,12 +58,12 @@ namespace MaxTeamPlayersOverride
 
             if (!IsWarmup())
             {
-                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能禁用人數覆蓋。");
+                player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能禁用人數最大化。");
                 return;
             }
 
             _isOverrideEnabled = false;
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋（下回合生效）。");
+            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數人數最大化。");
         }
 
         // 偵測是否在熱身期間
