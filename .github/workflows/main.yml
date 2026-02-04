@@ -1,0 +1,46 @@
+name: Build and Release CS2 Plugin
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # 允許手動觸發編譯
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 檢出原始碼
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 設定 .NET 8 SDK (CS2 插件的核心環境)
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # 3. 恢復專案依賴 (Nuget)
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # 4. 編譯插件 (Release 模式)
+      - name: Build Plugin
+        run: dotnet build --configuration Release --no-restore
+
+      # 5. 整理編譯產物
+      # 這裡會抓取 bin/Release/net8.0/ 底下的所有檔案
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p ./publish
+          cp bin/Release/net8.0/*.dll ./publish/
+          # 如果你有額外的翻譯檔或設定範本，也可以在這裡 cp 進去
+
+      # 6. 上傳到 GitHub Actions 介面供下載
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaxTeamPlayersOverride-v${{ github.run_number }}
+          path: ./publish/
