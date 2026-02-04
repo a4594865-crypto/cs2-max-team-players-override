@@ -6,7 +6,6 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Utils;
-using CounterStrikeSharp.API.Modules.Entities;
 
 namespace MaxTeamPlayersOverride
 {
@@ -18,8 +17,8 @@ namespace MaxTeamPlayersOverride
 
         public override void Load(bool hotReload)
         {
-            // 監聽聊天事件
-            RegisterEventHandler<EventPlayerChat>((@event, info) =>
+            // 使用強制路徑引用，解決找不到 EventPlayerChat 的問題
+            RegisterEventHandler<CounterStrikeSharp.API.Core.EventPlayerChat>((@event, info) =>
             {
                 if (@event == null) return HookResult.Continue;
                 
@@ -40,7 +39,7 @@ namespace MaxTeamPlayersOverride
                         } 
                         else 
                         {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改人數限制。");
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
                         }
                         return HookResult.Handled;
                     }
@@ -56,7 +55,7 @@ namespace MaxTeamPlayersOverride
                         } 
                         else 
                         {
-                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能恢復預設。");
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
                         }
                         return HookResult.Handled;
                     }
@@ -65,7 +64,7 @@ namespace MaxTeamPlayersOverride
                 return HookResult.Continue;
             });
 
-            RegisterEventHandler<EventRoundStart>((@event, info) =>
+            RegisterEventHandler<CounterStrikeSharp.API.Core.EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
                 ApplyTeamLimits();
@@ -76,7 +75,7 @@ namespace MaxTeamPlayersOverride
         private bool IsWarmup()
         {
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-            // 在 1.0.362 中，請確保使用 WarmupPeriod 或 InWarmup
+            // 針對 1.0.362 版本的實體屬性路徑
             return gameRulesProxy?.GameRules?.WarmupPeriod ?? false;
         }
 
