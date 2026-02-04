@@ -10,18 +10,20 @@ using CounterStrikeSharp.API.Modules.Entities;
 
 namespace MaxTeamPlayersOverride
 {
+    // 使用 partial 確保能與 Version.cs 結合
     public partial class MaxTeamPlayersOverride : BasePlugin
     {
-        // 核心狀態開關：預設關閉 (5v5)
         private bool _isOverrideEnabled = false;
 
-        public override string ModuleName => "Max Team Players Override (Warmup Locked)";
+        public override string ModuleName => "Max Team Players Override";
 
-        // 注意：這裡不定義 ModuleVersion，因為它已經在 src/Version.cs 裡面了，避免重複定義錯誤
+        // 移除 ModuleVersion 定義，避免與 Version.cs 重複
 
         public override void Load(bool hotReload)
         {
-            // 監聽聊天事件，處理自定義指令
+            // 監聽聊天事件
+            // 如果編譯器在此處報錯，代表你的 SDK 版本可能不支援 EventPlayerChat
+            // 建議檢查 .csproj 中的 CounterStrikeSharp.API 版本
             RegisterEventHandler<EventPlayerChat>((@event, info) =>
             {
                 var player = @event.Userid;
@@ -29,97 +31,70 @@ namespace MaxTeamPlayersOverride
 
                 string message = @event.Text.Trim();
 
-                bool isEnableCmd = message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase);
-                bool isDisableCmd = message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase);
-
-                if (isEnableCmd || isDisableCmd)
+                if (message.Equals(".ctmax", StringComparison.OrdinalIgnoreCase))
                 {
-                    // 1. 權限檢查：需具備 generic 管理權限
-                    if (!AdminManager.PlayerHasPermissions(player, "@css/generic")) return HookResult.Continue;
-
-                    // 2. 熱身檢查邏輯
-                    if (!IsWarmup())
+                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
                     {
-                        player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能更改人數限制。");
+                        if (IsWarmup()) {
+                            _isOverrideEnabled = true;
+                            ApplyTeamLimits();
+                            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋。");
+                        } else {
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
+                        }
                         return HookResult.Handled;
                     }
-
-                    // 3. 執行動作
-                    if (isEnableCmd) EnableOverride();
-                    else DisableOverride();
-
-                    return HookResult.Handled;
+                }
+                else if (message.Equals(".unctmax", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (AdminManager.PlayerHasPermissions(player, "@css/generic"))
+                    {
+                        if (IsWarmup()) {
+                            _isOverrideEnabled = false;
+                            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋。");
+                        } else {
+                            player.PrintToChat($" {ChatColors.Red}★ {ChatColors.Default}錯誤：{ChatColors.Orange}僅限熱身期間{ChatColors.Default}才能修改。");
+                        }
+                        return HookResult.Handled;
+                    }
                 }
 
                 return HookResult.Continue;
             });
 
-            // 每回合開始時強制套用人數限制
             RegisterEventHandler<EventRoundStart>((@event, info) =>
             {
                 if (!_isOverrideEnabled) return HookResult.Continue;
                 ApplyTeamLimits();
                 return HookResult.Continue;
             });
-
-            Console.WriteLine("[MaxTeam] 插件載入成功。目前狀態：等待管理員於熱身期間啟用。");
         }
 
-        // 修改後的熱身判斷邏輯：使用 WaitDuringWarmup 提高相容性
+        // --- 核心修復：相容性最高的熱身判斷 ---
         private bool IsWarmup()
         {
             var gameRulesProxy = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault();
-            var gameRules = gameRulesProxy?.GameRules;
+            if (gameRulesProxy == null || gameRulesProxy.GameRules == null) return false;
 
-            // CS2 引擎判斷是否在熱身階段的關鍵屬性
-            return gameRules?.WaitDuringWarmup ?? false;
-        }
-
-        private void EnableOverride()
-        {
-            _isOverrideEnabled = true;
-            ApplyTeamLimits();
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Lime}啟用{ChatColors.Default}人數覆蓋（突破 5v5 限制）。");
-        }
-
-        private void DisableOverride()
-        {
-            _isOverrideEnabled = false;
-            Server.PrintToChatAll($" {ChatColors.Green}★ {ChatColors.Default}管理員已{ChatColors.Red}禁用{ChatColors.Default}人數覆蓋（下回合恢復 5v5）。");
+            // 嘗試使用不同的屬性名稱來獲取熱身狀態
+            // 這是 CS2 中最底層的熱身判斷標誌
+            return gameRulesProxy.GameRules.WarmupPeriod; 
         }
 
         private void ApplyTeamLimits()
         {
-            // 這些數值會自動從你的 config.json 讀取
             int maxTs = Config.MaxTs < 0 ? Server.MaxPlayers / 2 : Config.MaxTs;
             int maxCTs = Config.MaxCTs < 0 ? Server.MaxPlayers / 2 : Config.MaxCTs;
 
-            SetMaxTs(maxTs);
-            SetMaxCTs(maxCTs);
-        }
-
-        private static void SetMaxTs(int num)
-        {
             var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
             foreach (var ent in ents)
             {
                 if (ent.GameRules != null)
                 {
-                    ent.GameRules.NumSpawnableTerrorist = num;
-                    ent.GameRules.MaxNumTerrorists = num;
-                }
-            }
-        }
-
-        private static void SetMaxCTs(int num)
-        {
-            var ents = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules");
-            foreach (var ent in ents)
-            {
-                if (ent.GameRules != null)
-                {
-                    ent.GameRules.NumSpawnableCT = num;
-                    ent.GameRules.MaxNumCTs = num;
+                    ent.GameRules.NumSpawnableTerrorist = maxTs;
+                    ent.GameRules.MaxNumTerrorists = maxTs;
+                    ent.GameRules.NumSpawnableCT = maxCTs;
+                    ent.GameRules.MaxNumCTs = maxCTs;
                 }
             }
         }
