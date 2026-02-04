@@ -13,7 +13,6 @@ namespace MaxTeamPlayersOverride
         private bool _isOverrideEnabled = false;
 
         public override string ModuleName => "Max Team Players Override (Warmup Only)";
-        public override string ModuleVersion => "1.0.7";
 
         public override void Load(bool hotReload)
         {
