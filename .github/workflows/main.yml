@@ -18,7 +18,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x # 🎯 升級至 .NET 10
+          dotnet-quality: 'preview' # 🎯 開啟預覽版通道
 
       - name: Restore dependencies
         run: dotnet restore
@@ -27,14 +28,16 @@ jobs:
       - name: Publish Plugin
         run: dotnet publish --configuration Release --no-restore -o ./publish
 
-      # 5. 【關鍵修改】精確清理：只保留官方三件套
+      # 5. 【關鍵修改】精確清理：保留主程式 .dll 與必要的 .deps.json 檔案
       # 刪除所有 pdb (偵錯檔) 和 xml (說明檔)
-      # 並且刪除除了主程式以外的所有 dll，因為伺服器已經內建了這些零件
+      # 刪除除了主程式以外的所有 dll，但留著相依性設定檔，因為 .NET 10 伺服器必須讀取它
       - name: Cleanup Non-essential files
         run: |
           find ./publish -type f -name "*.pdb" -delete
           find ./publish -type f -name "*.xml" -delete
           find ./publish -type f -name "*.dll" ! -name "MaxTeamPlayersOverride.dll" -delete
+          # 🎯 刪除除了主程式之外的其他 json 檔（如果有），但精確保留 MaxTeamPlayersOverride.deps.json
+          find ./publish -type f -name "*.json" ! -name "MaxTeamPlayersOverride.deps.json" -delete
 
       # 6. 上傳結果
       - name: Upload Build Artifact
