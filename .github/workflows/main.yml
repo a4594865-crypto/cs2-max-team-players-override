@@ -18,8 +18,8 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x # 🎯 升級至 .NET 10
-          dotnet-quality: 'preview' # 🎯 開啟預覽版通道
+          dotnet-version: 10.0.x 
+          dotnet-quality: 'preview' 
 
       - name: Restore dependencies
         run: dotnet restore
@@ -36,7 +36,6 @@ jobs:
           find ./publish -type f -name "*.pdb" -delete
           find ./publish -type f -name "*.xml" -delete
           find ./publish -type f -name "*.dll" ! -name "MaxTeamPlayersOverride.dll" -delete
-          # 🎯 刪除除了主程式之外的其他 json 檔（如果有），但精確保留 MaxTeamPlayersOverride.deps.json
           find ./publish -type f -name "*.json" ! -name "MaxTeamPlayersOverride.deps.json" -delete
 
       # 6. 上傳結果
