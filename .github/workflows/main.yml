@@ -27,10 +27,6 @@ jobs:
       # 4. 執行發佈
       - name: Publish Plugin
         run: dotnet publish --configuration Release --no-restore -o ./publish
-
-      # 5. 【關鍵修改】精確清理：保留主程式 .dll 與必要的 .deps.json 檔案
-      # 刪除所有 pdb (偵錯檔) 和 xml (說明檔)
-      # 刪除除了主程式以外的所有 dll，但留著相依性設定檔，因為 .NET 10 伺服器必須讀取它
       - name: Cleanup Non-essential files
         run: |
           find ./publish -type f -name "*.pdb" -delete
